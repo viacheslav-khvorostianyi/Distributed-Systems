@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY . /app
+RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m grpc_tools.protoc \
+    --proto_path=. \
+    --python_out=. \
+    --grpc_python_out=. \
+    server.proto
+EXPOSE 8082 50053
+CMD ["python", "secondary.py", "--port", "8082", '--target_port', '50053']

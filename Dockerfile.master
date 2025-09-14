@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY . /app
+RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m grpc_tools.protoc \
+    --proto_path=. \
+    --python_out=. \
+    --grpc_python_out=. \
+    server.proto
+EXPOSE 50051
+CMD ["python", "master.py", "--port", "50051", "--number_of_replicas", "2"]

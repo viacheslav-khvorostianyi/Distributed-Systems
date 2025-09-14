@@ -4,7 +4,7 @@ import grpc
 import warnings
 
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
-import master_pb2 as master__pb2
+import server_pb2 as server__pb2
 
 GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
@@ -19,7 +19,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in master_pb2_grpc.py depends on'
+        + f' but the generated code in server_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -37,18 +37,13 @@ class LoggerStub(object):
         """
         self.ReceiveLog = channel.unary_unary(
                 '/Logger/ReceiveLog',
-                request_serializer=master__pb2.LogRequest.SerializeToString,
-                response_deserializer=master__pb2.LogReply.FromString,
-                _registered_method=True)
-        self.SendLog = channel.unary_unary(
-                '/Logger/SendLog',
-                request_serializer=master__pb2.LogRequest.SerializeToString,
-                response_deserializer=master__pb2.LogReply.FromString,
+                request_serializer=server__pb2.LogRequest.SerializeToString,
+                response_deserializer=server__pb2.LogReply.FromString,
                 _registered_method=True)
         self.GetAllLogs = channel.unary_unary(
                 '/Logger/GetAllLogs',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=master__pb2.AllLogs.FromString,
+                response_deserializer=server__pb2.AllLogs.FromString,
                 _registered_method=True)
 
 
@@ -56,12 +51,6 @@ class LoggerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def ReceiveLog(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendLog(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -78,18 +67,13 @@ def add_LoggerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ReceiveLog': grpc.unary_unary_rpc_method_handler(
                     servicer.ReceiveLog,
-                    request_deserializer=master__pb2.LogRequest.FromString,
-                    response_serializer=master__pb2.LogReply.SerializeToString,
-            ),
-            'SendLog': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendLog,
-                    request_deserializer=master__pb2.LogRequest.FromString,
-                    response_serializer=master__pb2.LogReply.SerializeToString,
+                    request_deserializer=server__pb2.LogRequest.FromString,
+                    response_serializer=server__pb2.LogReply.SerializeToString,
             ),
             'GetAllLogs': grpc.unary_unary_rpc_method_handler(
                     servicer.GetAllLogs,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=master__pb2.AllLogs.SerializeToString,
+                    response_serializer=server__pb2.AllLogs.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -117,35 +101,8 @@ class Logger(object):
             request,
             target,
             '/Logger/ReceiveLog',
-            master__pb2.LogRequest.SerializeToString,
-            master__pb2.LogReply.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendLog(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/Logger/SendLog',
-            master__pb2.LogRequest.SerializeToString,
-            master__pb2.LogReply.FromString,
+            server__pb2.LogRequest.SerializeToString,
+            server__pb2.LogReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -172,7 +129,79 @@ class Logger(object):
             target,
             '/Logger/GetAllLogs',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            master__pb2.AllLogs.FromString,
+            server__pb2.AllLogs.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class ReplicatorStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.ReplicateLog = channel.unary_unary(
+                '/Replicator/ReplicateLog',
+                request_serializer=server__pb2.LogTuple.SerializeToString,
+                response_deserializer=server__pb2.LogReply.FromString,
+                _registered_method=True)
+
+
+class ReplicatorServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def ReplicateLog(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ReplicatorServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'ReplicateLog': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReplicateLog,
+                    request_deserializer=server__pb2.LogTuple.FromString,
+                    response_serializer=server__pb2.LogReply.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'Replicator', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('Replicator', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class Replicator(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def ReplicateLog(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/Replicator/ReplicateLog',
+            server__pb2.LogTuple.SerializeToString,
+            server__pb2.LogReply.FromString,
             options,
             channel_credentials,
             insecure,

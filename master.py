@@ -1,31 +1,50 @@
 import asyncio
 import grpc
 import json
-import master_pb2
-import master_pb2_grpc
+import argparse
+import server_pb2
+import server_pb2_grpc
 from logging_config import setup_logger
-logger = setup_logger(__name__)
+logger = setup_logger('master')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--port', type=int, default=50051, help='Port to run the http server on')
+parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the http server on')
+parser.add_argument('--number_of_replicas', type=int, default=1, help='Number of replicas to forward logs to')
+port, host, number_of_replicas = parser.parse_args().port, parser.parse_args().host, parser.parse_args().number_of_replicas
 
 
-
-class LoggerService(master_pb2_grpc.LoggerServicer):
+class LoggerService(server_pb2_grpc.LoggerServicer):
     LOG = []
     async def ReceiveLog(self, request, context):
         logger.info(f"Received log: {request.message}")
         msg = json.loads(request.message)
-        self.LOG.append(master_pb2.LogTuple(id=msg['id'], message=msg['message']))
+        item = server_pb2.LogTuple(id=msg['id'], message=msg['message'])
+        self.LOG.append(item)
+        channels = [grpc.insecure_channel(f'{host}:{port + i}') for i in range(1, number_of_replicas + 1)]
+        for channel in channels:
+            try:
+                stub = server_pb2_grpc.ReplicatorStub(channel)
+                response = stub.ReplicateLog(item)
+                logger.info(f"Forwarded log to secondary {channel.__repr__()}: {response.message}")
+                logger.info(response.message)
+            except Exception as e:
+                logger.error(f"Failed to forward log to secondary: {e}")
+            finally:
+                channel.close()
 
-        return master_pb2.LogReply(message=f"message {msg['id']} successfully logged")
+        return server_pb2.LogReply(message=f"message {msg['id']} successfully logged")
 
     async def GetAllLogs(self, request, context):
-        return master_pb2.AllLogs(logs=self.LOG)
+        return server_pb2.AllLogs(logs=self.LOG)
 
-async def serve(port):
+
+async def serve():
     server = grpc.aio.server()
-    master_pb2_grpc.add_LoggerServicer_to_server(LoggerService(), server)
+    server_pb2_grpc.add_LoggerServicer_to_server(LoggerService(), server)
     server.add_insecure_port(f'[::]:{port}')
     await server.start()
     await server.wait_for_termination()
 
 if __name__ == '__main__':
-    asyncio.run(serve(50051))
+    asyncio.run(serve())

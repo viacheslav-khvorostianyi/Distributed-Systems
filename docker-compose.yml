@@ -1,14 +1,17 @@
 version: '3.8'
 services:
+  master_client:
+    build:
+      context: .
+      dockerfile: Dockerfile.master_client
+    ports:
+      - "8080:8080"
   master:
     build:
       context: .
       dockerfile: Dockerfile.master
     ports:
-      - "8080:8080"
       - "50051:50051"
-    volumes:
-      - .:/app
     depends_on:
       - secondary1
       - secondary2
@@ -20,8 +23,6 @@ services:
     ports:
       - "8081:8081"
       - "50052:50052"
-    volumes:
-      - .:/app
 
   secondary2:
     build:
@@ -30,5 +31,3 @@ services:
     ports:
       - "8082:8082"
       - "50053:50053"
-    volumes:
-      - .:/app

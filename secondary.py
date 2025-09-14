@@ -40,7 +40,7 @@ async def start_http_server():
     app.router.add_get('/logs', get_logs)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, host, port)
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
 async def serve():

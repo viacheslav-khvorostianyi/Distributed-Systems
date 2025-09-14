@@ -21,7 +21,7 @@ class LoggerService(server_pb2_grpc.LoggerServicer):
         msg = json.loads(request.message)
         item = server_pb2.LogTuple(id=msg['id'], message=msg['message'])
         self.LOG.append(item)
-        channels = [grpc.insecure_channel(f'{host}:{port + i}') for i in range(1, number_of_replicas + 1)]
+        channels = [grpc.insecure_channel(f'secondary{i}:{port + i}') for i in range(1, number_of_replicas + 1)]
         for channel in channels:
             try:
                 stub = server_pb2_grpc.ReplicatorStub(channel)

@@ -7,5 +7,5 @@ RUN python -m grpc_tools.protoc \
     --python_out=. \
     --grpc_python_out=. \
     server.proto
-EXPOSE 8082 50053
-CMD ["python", "secondary.py", "--port", "8082", "--target_port", "50053"]
+EXPOSE 50051
+CMD ["python", "master_client.py", "--port", "8080", "--target_port", "50051"]

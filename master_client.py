@@ -29,7 +29,7 @@ async def send_log():
     COUNTER += 1
     message = json.dumps({'id':COUNTER, 'message':data.get('message', 'default_message')})
     try:
-        with grpc.insecure_channel(f'{host}:{target_port}') as channel:
+        with grpc.insecure_channel(f'master:{target_port}') as channel:
             stub = server_pb2_grpc.LoggerStub(channel)
             response = stub.ReceiveLog(server_pb2.LogRequest(message=message))
             logger.info(f"Sent log to master at port {target_port}: {response.message}")
@@ -40,11 +40,11 @@ async def send_log():
 
 @app.route('/logs', methods=['GET'])
 async def get_logs():
-    with grpc.insecure_channel(f'{host}:{target_port}') as channel:
+    with grpc.insecure_channel(f'master:{target_port}') as channel:
         stub = server_pb2_grpc.LoggerStub(channel)
         response = stub.GetAllLogs(empty_pb2.Empty())
     logs = [{"id": log.id, 'message': log.message} for log in response.logs]
     return jsonify(logs)
 
 if __name__ == '__main__':
-    app.run(port=port)
+    app.run(port=port, host='0.0.0.0')

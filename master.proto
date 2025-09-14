@@ -1,0 +1,27 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+
+
+service Logger {
+  rpc ReceiveLog (LogRequest) returns (LogReply) {};
+  rpc SendLog (LogRequest) returns (LogReply) {};
+  rpc GetAllLogs (google.protobuf.Empty) returns (AllLogs) {};
+}
+
+message LogRequest {
+  string message = 1;
+}
+
+message LogReply {
+  string message = 1;
+}
+
+message LogTuple {
+  int32 id = 1;
+  string message = 2;
+}
+
+message AllLogs {
+  repeated LogTuple logs = 1;
+}
+

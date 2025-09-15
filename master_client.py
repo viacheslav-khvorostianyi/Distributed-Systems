@@ -43,7 +43,7 @@ async def get_logs():
     with grpc.insecure_channel(f'master:{target_port}') as channel:
         stub = server_pb2_grpc.LoggerStub(channel)
         response = stub.GetAllLogs(empty_pb2.Empty())
-    logs = [{"id": log.id, 'message': log.message} for log in response.logs]
+    logs = {'logs':[{"id": log.id, 'message': log.message} for log in response.logs]}
     return jsonify(logs)
 
 if __name__ == '__main__':

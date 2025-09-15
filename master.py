@@ -13,6 +13,16 @@ parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run t
 parser.add_argument('--number_of_replicas', type=int, default=1, help='Number of replicas to forward logs to')
 port, host, number_of_replicas = parser.parse_args().port, parser.parse_args().host, parser.parse_args().number_of_replicas
 
+class ChannelWrapper:
+    def __init__(self, name, channel):
+        self.name = name
+        self.channel = channel
+
+    def __repr__(self):
+        return f"<ChannelWrapper name={self.name}>"
+
+    def __getattr__(self, attr):
+        return getattr(self.channel, attr)
 
 class LoggerService(server_pb2_grpc.LoggerServicer):
     LOG = []
@@ -21,7 +31,10 @@ class LoggerService(server_pb2_grpc.LoggerServicer):
         msg = json.loads(request.message)
         item = server_pb2.LogTuple(id=msg['id'], message=msg['message'])
         self.LOG.append(item)
-        channels = [grpc.insecure_channel(f'secondary{i}:{port + i}') for i in range(1, number_of_replicas + 1)]
+        channels = [
+            ChannelWrapper(f'secondary{i}:{port + i}', grpc.insecure_channel(f'secondary{i}:{port + i}'))
+            for i in range(1, number_of_replicas + 1)
+        ]
         for channel in channels:
             try:
                 stub = server_pb2_grpc.ReplicatorStub(channel)

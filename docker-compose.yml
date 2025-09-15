@@ -6,6 +6,11 @@ services:
       dockerfile: Dockerfile.master_client
     ports:
       - "8080:8080"
+    depends_on:
+      - master
+    volumes:
+      - ./logs/master_client:/logs
+
   master:
     build:
       context: .
@@ -15,6 +20,8 @@ services:
     depends_on:
       - secondary1
       - secondary2
+    volumes:
+      - ./logs/master:/logs
 
   secondary1:
     build:
@@ -23,6 +30,8 @@ services:
     ports:
       - "8081:8081"
       - "50052:50052"
+    volumes:
+      - ./logs/secondary1:/logs
 
   secondary2:
     build:
@@ -31,3 +40,5 @@ services:
     ports:
       - "8082:8082"
       - "50053:50053"
+    volumes:
+      - ./logs/secondary2:/logs

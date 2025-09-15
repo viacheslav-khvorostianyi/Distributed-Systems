@@ -28,10 +28,10 @@ replicator_service = ReplicatorService()
 
 async def get_logs(request):
     # Convert protobuf messages to dicts for JSON serialization
-    logs = sorted([
+    logs = sorted(list(set([
         {"id": log.id, "message": log.message}
         for log in replicator_service.LOG
-    ], key=lambda log: log["id"])
+    ])), key=lambda log: log["id"])
 
     return web.json_response({"logs": logs})
 

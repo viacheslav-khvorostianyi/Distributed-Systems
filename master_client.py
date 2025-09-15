@@ -27,7 +27,7 @@ async def send_log():
     global COUNTER
     global PORT
     COUNTER += 1
-    message = json.dumps({'id':COUNTER, 'message':data.get('message', 'default_message')})
+    message = json.dumps({'id':COUNTER, 'message':str(data.get('message', 'default_message'))})
     try:
         with grpc.insecure_channel(f'master:{target_port}') as channel:
             stub = server_pb2_grpc.LoggerStub(channel)

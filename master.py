@@ -1,6 +1,7 @@
 import asyncio
 import grpc
 import json
+import time
 import argparse
 import server_pb2
 import server_pb2_grpc
@@ -38,11 +39,13 @@ class LoggerService(server_pb2_grpc.LoggerServicer):
         for channel in channels:
             try:
                 stub = server_pb2_grpc.ReplicatorStub(channel)
+                time.sleep(5)  # Simulate network delay
                 response = stub.ReplicateLog(item)
                 logger.info(f"Forwarded log to secondary {channel.__repr__()}: {response.message}")
                 logger.info(response.message)
             except Exception as e:
                 logger.error(f"Failed to forward log to secondary: {e}")
+                raise
             finally:
                 channel.close()
 

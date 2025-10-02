@@ -1,3 +1,5 @@
+import os
+
 import grpc
 import server_pb2
 import server_pb2_grpc
@@ -16,12 +18,19 @@ logger = setup_logger(f'server_secondary:{port}')
 
 class ReplicatorService(server_pb2_grpc.ReplicatorServicer):
     LOG = []
+    LOG_LOCK = asyncio.Lock()
+
     async def ReplicateLog(self, request, context):
+        await asyncio.sleep(int(os.environ.get('DELAY', 0)))
         logger.info(f"Received replicated log: {request.message}")
-        self.LOG.append(request)
+        async with self.LOG_LOCK:
+            self.LOG.append(request)
         return server_pb2.LogReply(message=f"message {request.id} successfully replicated on port {port}")
+
     async def GetAllLogs(self, request, context):
-        return server_pb2.AllLogs(logs=self.LOG)
+        async with self.LOG_LOCK:
+            logs_copy = list(self.LOG)
+        return server_pb2.AllLogs(logs=logs_copy)
 
 
 replicator_service = ReplicatorService()

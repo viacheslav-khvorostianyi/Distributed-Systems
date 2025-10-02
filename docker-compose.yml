@@ -1,22 +1,13 @@
-version: '3.8'
+version: '3.9'
 services:
-  master_client:
-    build:
-      context: .
-      dockerfile: Dockerfile.master_client
-    ports:
-      - "8080:8080"
-    depends_on:
-      - master
-    volumes:
-      - ./logs/master_client:/logs
 
   master:
     build:
-      context: .
+      context: ./master
       dockerfile: Dockerfile.master
     ports:
       - "50051:50051"
+      - "8080:8080"
     depends_on:
       - secondary1
       - secondary2
@@ -25,20 +16,23 @@ services:
 
   secondary1:
     build:
-      context: .
+      context: ./secondary
       dockerfile: Dockerfile.secondary1
     ports:
       - "8081:8081"
       - "50052:50052"
+    environment:
+      DELAY: 5
     volumes:
       - ./logs/secondary1:/logs
 
   secondary2:
     build:
-      context: .
+      context: ./secondary
       dockerfile: Dockerfile.secondary2
     ports:
       - "8082:8082"
       - "50053:50053"
     volumes:
       - ./logs/secondary2:/logs
+

@@ -22,8 +22,8 @@ This project implements a distributed logging system using Python, gRPC, and Qua
 2. **Build and start all services:**  `docker-compose up --build`
 3. **Access the master client API:**
    - Send logs: `curl -X POST  -H "Content-Type: application/json" -d '{"message": "Hello World"}' http://127.0.0.1:8080/send_log`
-   - Get logs: `curl http:127.0.0.1:8080/logs` from master client.
-   - Get logs from secondary servers: `curl http:127.0.0.1:8081/logs` and `curl http:127.0.0.1:8082/logs`
+   - Get logs: `curl http://127.0.0.1:8080/logs` from master client.
+   - Get logs from secondary servers: `curl http://127.0.0.1:8081/logs` and `curl http://127.0.0.1:8082/logs`
 
 ## Configuration
 

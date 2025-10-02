@@ -6,11 +6,9 @@ This project implements a distributed logging system using Python, gRPC, and Qua
 
 - `master.py` - Master server handling log reception and forwarding.
 - `secondary.py` - Secondary servers for log replication.
-- `master_client.py` - HTTP API for sending logs to the master via gRPC.
 - `server.proto` - Protocol Buffers definition for gRPC services.
-- `server_pb2.py`, `server_pb2_grpc.py` - Generated gRPC code.
 - `logging_config.py` - Logging setup utility.
-- `Dockerfile.master`, `Dockerfile.secondary1`, `Dockerfile.secondary2`, `Dockerfile.master_client` - Dockerfiles for each service.
+- `Dockerfile.master`, `Dockerfile.secondary1`, `Dockerfile.secondary2` - Dockerfiles for each service.
 - `docker-compose.yml` - Orchestrates all services.
 - `requirements.txt` - Python dependencies.
 - `.gitignore` - Git ignore file.

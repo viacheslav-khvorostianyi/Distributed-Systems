@@ -87,7 +87,7 @@ async def send_log():
         message_id = COUNTER
     message = json.dumps({'id':message_id, 'message':str(data.get('message', 'default_message'))})
     try:
-        async with grpc.aio.insecure_channel(f'master:{target_port}/{message_id}') as channel:
+        async with grpc.aio.insecure_channel(f'master:{target_port}') as channel:
             stub = server_pb2_grpc.LoggerStub(channel)
             response = await stub.ReceiveLog(server_pb2.LogRequest(message=message))
             logger.info(f"Sent log to master at port {target_port}: {response.message}")

@@ -25,7 +25,7 @@ class ReplicatorService(server_pb2_grpc.ReplicatorServicer):
         logger.info(f"Received replicated log: {request.message}")
         async with self.LOG_LOCK:
             self.LOG.append(request)
-        return server_pb2.LogReply(message=f"message {request.id} successfully replicated on port {port}")
+        return server_pb2.LogReply(message=f"message {request.id} successfully replicated")
 
     async def GetAllLogs(self, request, context):
         async with self.LOG_LOCK:

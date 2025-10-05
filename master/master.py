@@ -19,7 +19,7 @@ parser.add_argument('--target_port', type=int, default=50051, help='Port to run 
 parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the http server on')
 parser.add_argument('--number_of_replicas', type=int, default=1, help='Number of replicas to forward logs to')
 parser.add_argument('--port', type=int, default=8080, help='Port to run the http server on')
-parser.add_argument('--write_concern', type=int, default=2, help='Number of acknowledgements required before responding to client')
+parser.add_argument('--write_concern', type=int, default=3, help='Number of acknowledgements required before responding to client')
 port, host, number_of_replicas, target_port, write_concern = (parser.parse_args().port, parser.parse_args().host,
                                   parser.parse_args().number_of_replicas, parser.parse_args().target_port, parser.parse_args().write_concern)
 
@@ -44,7 +44,7 @@ class LoggerService(server_pb2_grpc.LoggerServicer):
         start_time = asyncio.get_event_loop().time()
         while (asyncio.get_event_loop().time() - start_time) < timeout:
             await asyncio.sleep(0.1)
-            if self.ACKS.get(log_id, 0) >= write_concern:
+            if self.ACKS.get(log_id, 0)+1 >= write_concern:
                 logger.info(f"Write concern met for log {log_id}")
                 break
         else:

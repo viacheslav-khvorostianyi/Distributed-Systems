@@ -9,7 +9,7 @@ services:
       - "50051:50051"
       - "8080:8080"
     environment:
-      TIMEOUT: 1
+      TIMEOUT: 3
     depends_on:
       - secondary1
       - secondary2

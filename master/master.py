@@ -80,10 +80,10 @@ class LoggerService(server_pb2_grpc.LoggerServicer):
         asyncio.create_task(self.check_write_concern(log_id))
         return server_pb2.LogReply(message=f"message {log_id} forwarded to secondaries")
 
-async def GetAllLogs(self, request, context):
-    async with self.LOG_LOCK:
-        logs_copy = list(self.LOG)
-    return server_pb2.AllLogs(logs=logs_copy)
+    async def GetAllLogs(self, request, context):
+        async with self.LOG_LOCK:
+            logs_copy = list(self.LOG)
+        return server_pb2.AllLogs(logs=logs_copy)
 
 
 async def serve():

@@ -6,13 +6,12 @@ services:
       context: ./master
       dockerfile: Dockerfile.master
     ports:
-      - "50051:50051"
       - "8080:8080"
-    environment:
-      TIMEOUT: 3
     depends_on:
       - secondary1
       - secondary2
+    environment:
+      MAX_RETRIES: 3
     volumes:
       - ./logs/master:/logs
 
@@ -35,6 +34,8 @@ services:
     ports:
       - "8082:8082"
       - "50053:50053"
+    environment:
+      DELAY: 1
     volumes:
       - ./logs/secondary2:/logs
 

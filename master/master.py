@@ -40,6 +40,8 @@ COUNTER = 0
 COUNTER_LOCK = asyncio.Lock()
 LOG = []
 LOG_LOCK = asyncio.Lock()
+ACKS = {}
+ACKS_LOCK = asyncio.Lock()
 SECONDARY_CHANNELS = {}
 SECONDARY_HEALTH = {}
 READ_ONLY_MODE = False
@@ -71,7 +73,7 @@ def update_health_status(channel_name):
         SECONDARY_HEALTH[channel_name]['status'] = HealthStatus.HEALTHY
 
 
-async def forward_log_to_secondary(channel_name, item, log_id, ACKS):
+async def forward_log_to_secondary(channel_name, item, log_id, ack_event):
     """Forward log with unlimited retries and exponential backoff"""
     attempt = 0
     base_delay = 1
@@ -85,7 +87,8 @@ async def forward_log_to_secondary(channel_name, item, log_id, ACKS):
 
             if response.success:
                 logger.info(f"Log {log_id} forwarded to {channel_name}")
-                ACKS[log_id] = ACKS.get(log_id, 0) + 1
+                async with ACKS_LOCK:
+                    ACKS[log_id] = ACKS.get(log_id, 0) + 1
                 SECONDARY_HEALTH[channel_name]['last_check'] = time.time()
                 SECONDARY_HEALTH[channel_name]['status'] = HealthStatus.HEALTHY
                 SECONDARY_HEALTH[channel_name]['last_log_id'] = log_id
@@ -94,7 +97,6 @@ async def forward_log_to_secondary(channel_name, item, log_id, ACKS):
             attempt += 1
             update_health_status(channel_name)
 
-            # Smart delay based on health status
             if SECONDARY_HEALTH[channel_name]['status'] == HealthStatus.UNHEALTHY:
                 delay = max_delay
             else:
@@ -112,7 +114,6 @@ async def sync_secondary(channel_name):
         channel = SECONDARY_CHANNELS[channel_name]
         stub = server_pb2_grpc.ReplicatorStub(channel)
 
-        # Get secondary's last ID
         health = await stub.Heartbeat(
             server_pb2.HeartbeatRequest(secondary_name=channel_name)
         )
@@ -120,12 +121,11 @@ async def sync_secondary(channel_name):
 
         logger.info(f"Syncing {channel_name}, last_id={last_id}")
 
-        # Send missed messages
         async with LOG_LOCK:
             for msg_id, message in LOG:
                 if msg_id > last_id:
                     item = server_pb2.LogTuple(id=msg_id, message=message)
-                    await forward_log_to_secondary(channel_name, item, msg_id, {})
+                    await forward_log_to_secondary(channel_name, item, msg_id, None)
 
         logger.info(f"Sync completed for {channel_name}")
     except Exception as e:
@@ -151,7 +151,6 @@ async def heartbeat_loop():
                     'last_log_id': response.last_log_id
                 }
 
-                # If secondary recovered, sync missed logs
                 if old_status != HealthStatus.HEALTHY:
                     logger.info(f"{channel_name} recovered, starting sync")
                     asyncio.create_task(sync_secondary(channel_name))
@@ -160,7 +159,6 @@ async def heartbeat_loop():
                 logger.debug(f"Heartbeat failed for {channel_name}: {e}")
                 update_health_status(channel_name)
 
-        # Check quorum
         check_quorum()
         await asyncio.sleep(args.heartbeat_interval)
 
@@ -172,11 +170,9 @@ def check_quorum():
         1 for h in SECONDARY_HEALTH.values()
         if h['status'] == HealthStatus.HEALTHY
     )
-    # Master counts as 1, so total nodes = number_of_replicas + 1
     total_nodes = number_of_replicas + 1
     required_quorum = (total_nodes // 2) + 1
 
-    # Master is always healthy, so add 1
     has_quorum = (healthy + 1) >= required_quorum
 
     if not has_quorum and not READ_ONLY_MODE:
@@ -209,40 +205,39 @@ async def send_log():
         COUNTER += 1
         message_id = COUNTER
 
-    ACKS = {message_id: 1}  # Master counts as 1 ack
+    async with ACKS_LOCK:
+        ACKS[message_id] = 1  # Master counts as 1 ack
     ack_event = asyncio.Event()
     message = str(data.get('message', 'default_message'))
 
-    # Store in master log
     async with LOG_LOCK:
         LOG.append((message_id, message))
 
     async def forward_and_ack(channel_name, item, log_id):
         try:
-            await forward_log_to_secondary(channel_name, item, log_id, ACKS)
-            if ACKS.get(log_id, 0) >= w:
-                ack_event.set()
+            await forward_log_to_secondary(channel_name, item, log_id, ack_event)
+            async with ACKS_LOCK:
+                if ACKS.get(log_id, 0) >= w:
+                    ack_event.set()
         except Exception as e:
             logger.error(f"Forward task failed for {channel_name}: {e}")
 
     try:
         item = server_pb2.LogTuple(id=message_id, message=message)
 
-        # Forward to all secondaries
         for channel_name in SECONDARY_CHANNELS:
             asyncio.create_task(forward_and_ack(channel_name, item, message_id))
 
-        # If w=1, master ack is enough
         if w == 1:
             ack_event.set()
 
-        # Wait for required acks with timeout
         try:
             await asyncio.wait_for(ack_event.wait(), timeout=120)
         except asyncio.TimeoutError:
             logger.warning(f"Timeout waiting for acks for message {message_id}")
 
-        ack_count = ACKS.get(message_id, 0)
+        async with ACKS_LOCK:
+            ack_count = ACKS.get(message_id, 0)
 
         if ack_count >= w:
             return jsonify({'status': 200, 'acks': ack_count, 'message_id': message_id})
@@ -259,7 +254,8 @@ async def send_log():
         traceback.print_exception(type(e), e, e.__traceback__)
         return jsonify({'status': 500, 'error': 'Internal server error'}), 500
     finally:
-        ACKS.pop(message_id, None)
+        async with ACKS_LOCK:
+            ACKS.pop(message_id, None)
 
 
 @app.route('/logs', methods=['GET'])

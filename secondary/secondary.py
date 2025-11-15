@@ -1,65 +1,155 @@
-import os
-
+import asyncio
 import grpc
 import server_pb2
 import server_pb2_grpc
 from logging_config import setup_logger
-import asyncio
-from aiohttp import web
 import argparse
+from quart import Quart, jsonify
+import os
 
+logger = setup_logger('secondary')
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--port', type=int, default=8081, help='Port to run the http server on')
-parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to run the gRPC server on')
-parser.add_argument('--target_port', type=int, default=50052, help='Port to run the gRPC server on')
-port, host, target_port = parser.parse_args().port, parser.parse_args().host, parser.parse_args().target_port
-logger = setup_logger(f'server_secondary:{port}')
+parser.add_argument('--port', type=int, default=50052)
+parser.add_argument('--http_port', type=int, default=8081)
+parser.add_argument('--error_rate', type=float, default=0.1)
+args = parser.parse_args()
 
-class ReplicatorService(server_pb2_grpc.ReplicatorServicer):
-    LOG = []
-    LOG_LOCK = asyncio.Lock()
+# Override with environment variable if present
+NETWORK_DELAY = float(os.getenv('DELAY', 0))
 
+# Create Quart app
+app = Quart(__name__)
+
+# Deduplication tracking
+received_message_ids = set()
+
+# Total order tracking
+log = []
+buffered_messages = {}
+next_expected_id = 1
+log_lock = asyncio.Lock()
+
+
+def process_buffered_messages():
+    """Process all consecutive messages from buffer"""
+    global next_expected_id
+
+    while next_expected_id in buffered_messages:
+        message = buffered_messages[next_expected_id]
+        log.append((next_expected_id, message))
+        logger.info(f"Added message {next_expected_id} to log (from buffer)")
+        del buffered_messages[next_expected_id]
+        next_expected_id += 1
+
+
+class ReplicatorServicer(server_pb2_grpc.ReplicatorServicer):
     async def ReplicateLog(self, request, context):
-        await asyncio.sleep(int(os.environ.get('DELAY', 0)))
-        logger.info(f"Received replicated log: {request.message}")
-        async with self.LOG_LOCK:
-            self.LOG.append(request)
-        return server_pb2.LogReply(message=f"message {request.id} successfully replicated")
+        """Handle log replication with deduplication and total order"""
+        # Simulate network delay
+        if NETWORK_DELAY > 0:
+            logger.debug(f"Simulating network delay of {NETWORK_DELAY}s")
+            await asyncio.sleep(NETWORK_DELAY)
 
-    async def GetAllLogs(self, request, context):
-        async with self.LOG_LOCK:
-            logs_copy = list(self.LOG)
-        return server_pb2.AllLogs(logs=logs_copy)
+        async with log_lock:
+            # Deduplication check
+            if request.id in received_message_ids:
+                logger.info(f"Duplicate message {request.id}, skipping")
+                return server_pb2.LogResponse(message="Duplicate", success=True)
+
+            # Mark as received immediately
+            received_message_ids.add(request.id)
+
+            # Total order handling
+            global next_expected_id
+
+            if request.id == next_expected_id:
+                # Expected message, add to log
+                log.append((request.id, request.message))
+                logger.info(f"Added message {request.id} to log")
+                next_expected_id += 1
+
+                # Process any buffered consecutive messages
+                process_buffered_messages()
+            else:
+                # Out of order, buffer it
+                logger.info(f"Buffering out-of-order message {request.id}, expecting {next_expected_id}")
+                buffered_messages[request.id] = request.message
+
+            return server_pb2.LogResponse(message="Success", success=True)
+
+    async def Heartbeat(self, request, context):
+        """Handle heartbeat requests"""
+
+        last_log_id = log[-1][0] if log else 0
+        logger.debug(f"Heartbeat from {request.secondary_name}, last_log_id={last_log_id}")
+        return server_pb2.HeartbeatResponse(
+            status="Healthy",
+            last_log_id=last_log_id
+        )
+
+    async def GetMissedLogs(self, request, context):
+        """Return logs that secondary missed"""
+        # Simulate network delay
+        if NETWORK_DELAY > 0:
+            await asyncio.sleep(NETWORK_DELAY)
+
+        async with log_lock:
+            missed_logs = [
+                server_pb2.LogTuple(id=msg_id, message=msg)
+                for msg_id, msg in log
+                if msg_id > request.last_received_id
+            ]
+            logger.info(f"Sending {len(missed_logs)} missed logs")
+            return server_pb2.MissedLogsResponse(logs=missed_logs)
 
 
-replicator_service = ReplicatorService()
+@app.route('/logs', methods=['GET'])
+async def get_logs():
+    """Get all logs from this secondary"""
+    async with log_lock:
+        return jsonify({
+            'logs': [{'id': msg_id, 'message': msg} for msg_id, msg in log]
+        })
 
-async def get_logs(request):
-    # Convert protobuf messages to dicts for JSON serialization
-    logs = [{'id': item[0], 'mesaage': item[1]}
-            for item in sorted(list(set([
-        (log.id, log.message)
-        for log in replicator_service.LOG
-    ])), key=lambda log: log[0])]
 
-    return web.json_response({"logs": logs})
+@app.route('/health', methods=['GET'])
+async def health_check():
+    """Health check endpoint"""
+    async with log_lock:
+        return jsonify({
+            'status': 'healthy',
+            'last_log_id': log[-1][0] if log else 0,
+            'total_logs': len(log),
+            'buffered_messages': len(buffered_messages),
+            'next_expected_id': next_expected_id,
+            'network_delay': NETWORK_DELAY
+        })
 
-async def start_http_server():
-    app = web.Application()
-    app.router.add_get('/logs', get_logs)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
 
-async def serve():
-    grpc_server = grpc.aio.server()
-    server_pb2_grpc.add_ReplicatorServicer_to_server(replicator_service, grpc_server)
-    grpc_server.add_insecure_port(f'[::]:{target_port}')
-    await grpc_server.start()
-    await start_http_server()
-    await grpc_server.wait_for_termination()
+async def serve_grpc():
+    """Start gRPC server"""
+    server = grpc.aio.server()
+    server_pb2_grpc.add_ReplicatorServicer_to_server(ReplicatorServicer(), server)
+    server.add_insecure_port(f'[::]:{args.port}')
+    await server.start()
+    logger.info(f"gRPC server started on port {args.port} with network delay={NETWORK_DELAY}s")
+    await server.wait_for_termination()
+
+
+async def serve_http():
+    """Start HTTP server"""
+    logger.info(f"HTTP server starting on port {args.http_port}")
+    await app.run_task(host='0.0.0.0', port=args.http_port)
+
+
+async def main():
+    """Run both gRPC and HTTP servers concurrently"""
+    await asyncio.gather(
+        serve_grpc(),
+        serve_http()
+    )
+
 
 if __name__ == '__main__':
-    asyncio.run(serve())
+    asyncio.run(main())

@@ -1,22 +1,9 @@
 syntax = "proto3";
-import "google/protobuf/empty.proto";
-
-
-service Logger {
-  rpc ReceiveLog (LogRequest) returns (LogReply) {};
-  rpc GetAllLogs (google.protobuf.Empty) returns (AllLogs) {};
-}
 
 service Replicator {
-  rpc ReplicateLog (LogTuple) returns (LogReply) {};
-}
-
-message LogRequest {
-  string message = 1;
-}
-
-message LogReply {
-  string message = 1;
+  rpc ReplicateLog(LogTuple) returns (LogResponse);
+  rpc GetMissedLogs(MissedLogsRequest) returns (MissedLogsResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 }
 
 message LogTuple {
@@ -24,7 +11,24 @@ message LogTuple {
   string message = 2;
 }
 
-message AllLogs {
+message LogResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+message MissedLogsRequest {
+  int32 last_received_id = 1;
+}
+
+message MissedLogsResponse {
   repeated LogTuple logs = 1;
 }
 
+message HeartbeatRequest {
+  string secondary_name = 1;
+}
+
+message HeartbeatResponse {
+  string status = 1;
+  int32 last_log_id = 2;
+}
